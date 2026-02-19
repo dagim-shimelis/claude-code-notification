@@ -1,6 +1,33 @@
 # claude-code-notification
 
-macOS notifications for [Claude Code](https://claude.ai/code) — get alerted when Claude finishes a task, goes idle, or needs your permission to run something.
+**Native macOS notifications for [Claude Code](https://claude.ai/code)** — know the moment Claude finishes a task, goes idle, or needs your permission, even when you've switched to another app.
+
+[![npm version](https://img.shields.io/npm/v/@dagim_s/claude-code-notification?style=flat-square&color=black)](https://www.npmjs.com/package/@dagim_s/claude-code-notification)
+[![platform](https://img.shields.io/badge/platform-macOS-black?style=flat-square)](https://www.npmjs.com/package/@dagim_s/claude-code-notification)
+[![license](https://img.shields.io/npm/l/@dagim_s/claude-code-notification?style=flat-square&color=black)](LICENSE)
+
+---
+
+## What it looks like
+
+```
+┌─────────────────────────────────────────────────────┐
+│  [●] Claude Code                             now    │
+│      All changes applied. AuthModal now             │
+│      validates tokens on mount and redirects…       │
+│                                          [claude]   │
+└─────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────┐
+│  [●] Permission Required                     now    │
+│      Bash: npm run build                            │
+│                                          [claude]   │
+└─────────────────────────────────────────────────────┘
+```
+
+Notifications appear in the macOS notification center with the **Claude logo**, a **preview of Claude's last message** or the action requested, and a distinct sound — so you always know what's happening without looking at the terminal.
+
+---
 
 ## Install
 
@@ -8,55 +35,96 @@ macOS notifications for [Claude Code](https://claude.ai/code) — get alerted wh
 npx @dagim_s/claude-code-notification
 ```
 
-That's it. The setup script will:
+That's it. The setup script handles everything automatically:
 
-1. Check for `python3` (required)
-2. Install `terminal-notifier` via Homebrew if it's missing
-3. Copy the three hook scripts to `~/.claude/hooks/`
-4. Copy the Claude icon to `~/.claude/icons/`
-5. Patch `~/.claude/settings.json` to register the hooks
-6. Print a success summary
+1. Verifies `python3` and `clang` are available
+2. Compiles a tiny native notification helper (`ClaudeNotifier.app`)
+3. Copies the three hook scripts to `~/.claude/hooks/`
+4. Copies the Claude icon to `~/.claude/icons/`
+5. Patches `~/.claude/settings.json` to wire up the hooks
+6. Ad-hoc signs the app so macOS Notification Center accepts it
 
-Then **restart Claude Code** for the hooks to take effect.
+Then **restart Claude Code**. The first notification will prompt macOS for permission — click **Allow**.
 
-## What you get
+> Re-running `npx @dagim_s/claude-code-notification` is always safe. It skips anything already in place and never creates duplicate hook entries.
 
-| Event | Notification | Sound |
-|---|---|---|
-| Claude finishes a task | Summary of last response | Funk |
-| Claude is waiting for input | "Claude is waiting" | Glass |
-| Claude needs a permission | Tool name + what it wants to do | Glass |
+---
 
-All notifications activate VS Code when clicked.
+## Notifications at a glance
 
-## Requirements
+| Trigger | Title | Message | Sound |
+|---|---|---|---|
+| Claude finishes a response | `Claude Code` | First 120 chars of the last reply | Funk |
+| Claude is idle / waiting | `Claude Code` | Claude's own idle message | Glass |
+| Claude needs permission | `Permission Required` | Tool + what it wants to do | Glass |
 
-- macOS
-- [Claude Code](https://claude.ai/code) (the VS Code extension or CLI)
-- Python 3
-- [Homebrew](https://brew.sh) (used to install `terminal-notifier` automatically)
+### Permission notification examples
+
+```
+Bash: npm run dev
+Bash: git push origin main
+Write: Button.tsx
+WebFetch: https://api.example.com/data
+```
+
+---
 
 ## How it works
 
-The package registers three Claude Code hooks via `~/.claude/settings.json`:
+The package registers three [Claude Code hooks](https://docs.anthropic.com/en/docs/claude-code/hooks) in `~/.claude/settings.json`:
 
-- **`Stop`** → `stop-notification.py` — reads the transcript to extract the last assistant message and shows it as a notification
-- **`Notification`** (for `idle_prompt` and `permission_prompt` events) → `notification-with-icon.py` — forwards the notification with the Claude icon
-- **`PermissionRequest`** → `permission-request-notification.py` — shows the tool name and the specific command/file/URL it wants to access
+```
+Claude Code event
+      │
+      ├── Stop ──────────────────► stop-notification.py
+      │                            Reads transcript → extracts last reply
+      │
+      ├── Notification ──────────► notification-with-icon.py
+      │   (idle_prompt |           Forwards the notification message
+      │    permission_prompt)
+      │
+      └── PermissionRequest ─────► permission-request-notification.py
+                                   Shows tool name + command / file / URL
+```
 
-## Re-running
+Each hook script fires `ClaudeNotifier.app` — a minimal Objective-C app compiled locally during setup. It uses macOS's native `UNUserNotificationCenter` API, which is why the Claude icon and sounds work properly without any third-party dependencies.
 
-Running `npx @dagim_s/claude-code-notification` again is safe — it skips anything already installed and never duplicates hook entries.
+---
+
+## Requirements
+
+| Requirement | Notes |
+|---|---|
+| **macOS** | Notification Center API is macOS-only |
+| **Claude Code** | CLI or IDE extension |
+| **Python 3** | Runs the hook scripts |
+| **Xcode Command Line Tools** | Provides `clang` to compile the notifier |
+
+To install Xcode Command Line Tools if you don't have them:
+
+```bash
+xcode-select --install
+```
+
+---
 
 ## Uninstall
 
-Remove the hook scripts:
-
 ```bash
+# Remove hook scripts and icon
 rm ~/.claude/hooks/stop-notification.py \
    ~/.claude/hooks/notification-with-icon.py \
    ~/.claude/hooks/permission-request-notification.py \
    ~/.claude/icons/claude.png
+
+# Remove the notification helper app
+rm -rf ~/.claude/ClaudeNotifier.app
 ```
 
-Then remove the corresponding `Stop`, `Notification`, and `PermissionRequest` entries from `~/.claude/settings.json`.
+Then open `~/.claude/settings.json` and remove the `Stop`, `Notification`, and `PermissionRequest` hook entries.
+
+---
+
+## License
+
+MIT © [dagim-shimelis](https://github.com/dagim-shimelis)
