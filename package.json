@@ -1,6 +1,6 @@
 {
   "name": "@dagim_s/claude-code-notification",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "macOS notifications for Claude Code — get alerted when Claude finishes a task, goes idle, or needs your permission.",
   "bin": {
     "claude-code-notification": "./bin/setup.js"
