@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Notification hook: shows a rich macOS notification with the Claude logo
+Notification hook: shows a macOS notification with the Claude logo
 for permission_prompt and idle_prompt events.
-Uses terminal-notifier for the visual and claude-code-notification for VSCode focus.
+Uses ClaudeNotifier.app (UNUserNotificationCenter) for icon + sound support.
 """
 
 import json
@@ -11,6 +11,7 @@ import subprocess
 import sys
 
 ICON_PATH = os.path.expanduser("~/.claude/icons/claude.png")
+NOTIFIER = os.path.expanduser("~/.claude/ClaudeNotifier.app/Contents/MacOS/ClaudeNotifier")
 
 TITLES = {
     "permission_prompt": "Permission Required",
@@ -20,8 +21,8 @@ TITLES = {
 }
 
 SOUNDS = {
-    "permission_prompt": "Glass",
-    "idle_prompt": "Glass",
+    "permission_prompt": "Glass.aiff",
+    "idle_prompt": "Glass.aiff",
 }
 
 
@@ -35,27 +36,12 @@ def main():
     notification_type = hook_data.get("notification_type", "")
     message = hook_data.get("message", "Claude is waiting")
     title = TITLES.get(notification_type, "Claude Code")
-    sound = SOUNDS.get(notification_type, "Glass")
+    sound = SOUNDS.get(notification_type, "Glass.aiff")
 
-    # Show rich notification with Claude icon via terminal-notifier
-    notifier_cmd = [
-        "terminal-notifier",
-        "-title", title,
-        "-message", message,
-        "-sound", sound,
-        "-activate", "com.microsoft.VSCode",
-    ]
-    if os.path.exists(ICON_PATH):
-        notifier_cmd += ["-contentImage", ICON_PATH]
-    subprocess.Popen(notifier_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-    # Also call claude-code-notification for VSCode chat tab integration
     subprocess.Popen(
-        ["claude-code-notification", "--sound", sound],
-        stdin=subprocess.PIPE,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    ).communicate(input=raw.encode())
+        [NOTIFIER, title, message, sound, ICON_PATH],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
 
 
 if __name__ == "__main__":

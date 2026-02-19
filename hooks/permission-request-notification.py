@@ -2,6 +2,7 @@
 """
 PermissionRequest hook: shows a notification whenever Claude needs explicit
 permission for a tool, regardless of the permission mode.
+Uses ClaudeNotifier.app (UNUserNotificationCenter) for icon + sound support.
 """
 
 import json
@@ -10,13 +11,13 @@ import subprocess
 import sys
 
 ICON_PATH = os.path.expanduser("~/.claude/icons/claude.png")
+NOTIFIER = os.path.expanduser("~/.claude/ClaudeNotifier.app/Contents/MacOS/ClaudeNotifier")
 
 
 def build_message(hook_data: dict) -> str:
     tool = hook_data.get("tool_name", "unknown tool")
     tool_input = hook_data.get("tool_input", {})
 
-    # Show the most useful field depending on the tool
     if tool == "Bash":
         detail = tool_input.get("command", "")
         if detail:
@@ -42,34 +43,10 @@ def main():
 
     message = build_message(hook_data)
 
-    notifier_cmd = [
-        "terminal-notifier",
-        "-title", "Permission Required",
-        "-message", message,
-        "-sound", "Glass",
-        "-activate", "com.microsoft.VSCode",
-    ]
-    if os.path.exists(ICON_PATH):
-        notifier_cmd += ["-contentImage", ICON_PATH]
-    subprocess.Popen(notifier_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-    # Also call claude-code-notification for VSCode chat tab integration
-    notification = {
-        "message": message,
-        "title": "Permission Required",
-        "hook_event_name": "Notification",
-        "notification_type": "permission_prompt",
-        "session_id": hook_data.get("session_id", ""),
-        "transcript_path": hook_data.get("transcript_path", ""),
-        "cwd": hook_data.get("cwd", ""),
-        "permission_mode": hook_data.get("permission_mode", "default"),
-    }
     subprocess.Popen(
-        ["claude-code-notification", "--sound", "Glass"],
-        stdin=subprocess.PIPE,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    ).communicate(input=json.dumps(notification).encode())
+        [NOTIFIER, "Permission Required", message, "Glass.aiff", ICON_PATH],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
 
 
 if __name__ == "__main__":

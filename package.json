@@ -1,9 +1,9 @@
 {
   "name": "@dagim_s/claude-code-notification",
-  "version": "0.0.1",
+  "version": "1.1.0",
   "description": "macOS notifications for Claude Code — get alerted when Claude finishes a task, goes idle, or needs your permission.",
   "bin": {
-    "claude-code-notification": "./bin/setup.js"
+    "claude-code-notification": "bin/setup.js"
   },
   "scripts": {},
   "files": [
@@ -13,7 +13,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/dagim-shimelis/claude-code-notification.git"
+    "url": "git+https://github.com/dagim-shimelis/claude-code-notification.git"
   },
   "bugs": {
     "url": "https://github.com/dagim-shimelis/claude-code-notification/issues"

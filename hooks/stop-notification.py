@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """
-Stop hook: shows a native notification when Claude finishes executing.
+Stop hook: shows a macOS notification when Claude finishes executing.
 Reads the transcript to extract a brief summary of the last response.
-Uses terminal-notifier for a rich notification with the Claude icon.
-Also calls claude-code-notification in the background for VSCode click-to-focus.
+Uses ClaudeNotifier.app (UNUserNotificationCenter) for icon + sound support.
 """
 
 import json
@@ -12,6 +11,7 @@ import subprocess
 import sys
 
 ICON_PATH = os.path.expanduser("~/.claude/icons/claude.png")
+NOTIFIER = os.path.expanduser("~/.claude/ClaudeNotifier.app/Contents/MacOS/ClaudeNotifier")
 
 
 def extract_summary(transcript_path: str) -> str:
@@ -70,39 +70,10 @@ def main():
     transcript_path = hook_data.get("transcript_path", "")
     summary = extract_summary(transcript_path)
 
-    # Craft a notification payload that claude-code-notification understands.
-    # We reuse the idle_prompt notification_type so it uses the same VSCode
-    # integration path (click opens the Claude Code chat tab).
-    # Show rich notification with Claude icon via terminal-notifier
-    notifier_cmd = [
-        "terminal-notifier",
-        "-title", "Claude Code",
-        "-message", summary,
-        "-sound", "Funk",
-        "-activate", "com.microsoft.VSCode",
-    ]
-    if os.path.exists(ICON_PATH):
-        notifier_cmd += ["-contentImage", ICON_PATH]
-    subprocess.Popen(notifier_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-    # Also call claude-code-notification in the background so clicking the
-    # notification opens the Claude Code chat tab (VSCode extension integration).
-    notification = {
-        "message": summary,
-        "title": "Done",
-        "hook_event_name": "Notification",
-        "notification_type": "idle_prompt",
-        "session_id": hook_data.get("session_id", ""),
-        "transcript_path": transcript_path,
-        "cwd": hook_data.get("cwd", ""),
-        "permission_mode": hook_data.get("permission_mode", "default"),
-    }
     subprocess.Popen(
-        ["claude-code-notification", "--sound", "Funk"],
-        stdin=subprocess.PIPE,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    ).communicate(input=json.dumps(notification).encode())
+        [NOTIFIER, "Claude Code", summary, "Funk.aiff", ICON_PATH],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
 
 
 if __name__ == "__main__":
