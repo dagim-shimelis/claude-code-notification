@@ -43,8 +43,9 @@ That's it. The setup script handles everything automatically:
 4. Copies the Claude icon to `~/.claude/icons/`
 5. Patches `~/.claude/settings.json` to wire up the hooks
 6. Ad-hoc signs the app so macOS Notification Center accepts it
+7. Launches `ClaudeNotifier.app` once to trigger the macOS permission prompt
 
-Then **restart Claude Code**. The first notification will prompt macOS for permission — click **Allow**.
+During setup, `ClaudeNotifier.app` is launched once so macOS can show the **"Allow Notifications?"** prompt immediately — click **Allow**. Then **restart Claude Code**.
 
 > Re-running `npx @dagim_s/claude-code-notification` is always safe. It skips anything already in place and never creates duplicate hook entries.
 
@@ -111,17 +112,10 @@ xcode-select --install
 ## Uninstall
 
 ```bash
-# Remove hook scripts and icon
-rm ~/.claude/hooks/stop-notification.py \
-   ~/.claude/hooks/notification-with-icon.py \
-   ~/.claude/hooks/permission-request-notification.py \
-   ~/.claude/icons/claude.png
-
-# Remove the notification helper app
-rm -rf ~/.claude/ClaudeNotifier.app
+npx @dagim_s/claude-code-notification --uninstall
 ```
 
-Then open `~/.claude/settings.json` and remove the `Stop`, `Notification`, and `PermissionRequest` hook entries.
+This removes `ClaudeNotifier.app`, the hook scripts, the icon, the hook entries from `~/.claude/settings.json`, and resets the macOS notification permission — leaving your system in a clean state for reinstallation.
 
 ---
 

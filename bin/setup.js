@@ -248,7 +248,28 @@ function main() {
 
   ok("ClaudeNotifier.app built and signed");
 
-  // 8. Read / create settings.json
+  // 8. Trigger notification permission dialog now, during setup.
+  //    Launching via `open` gives the app a proper user-session context so
+  //    macOS shows the "Allow Notifications?" dialog immediately and registers
+  //    the app in System Settings → Notifications.  If we skip this, the first
+  //    launch happens inside a detached subprocess from a Claude hook — macOS
+  //    suppresses the dialog there and the app never appears in Notifications.
+  info("Requesting notification permission (watch for the system dialog)...");
+  try {
+    execSync(
+      `open -a "${NOTIFIER_APP}" --args "Claude Code" "Notifications are ready!" "Glass" ""`,
+      { stdio: "ignore" }
+    );
+    // Give the app a moment to show the dialog before we continue printing.
+    execSync("sleep 2", { stdio: "ignore" });
+    ok("Notification permission requested — click Allow in the system dialog if prompted");
+  } catch {
+    warn("Could not launch ClaudeNotifier for permission setup.");
+    warn("Run this manually to trigger the permission dialog:");
+    warn(`  open -a "${NOTIFIER_APP}"`);
+  }
+
+  // 9. Read / create settings.json
   let settings = {};
   if (fs.existsSync(SETTINGS_PATH)) {
     try {
@@ -282,9 +303,104 @@ function main() {
   log("  • Claude is waiting for your input (Notification)");
   log("  • Claude needs permission to run a command (PermissionRequest)");
   log("");
-  log("The first notification will prompt macOS for permission — click Allow.");
   log("Restart Claude Code for the hooks to take effect.");
   log("");
 }
 
-main();
+// ─── Uninstall ────────────────────────────────────────────────────────────────
+
+const BUNDLE_ID = "com.claude-code.notifier";
+
+function removeIfExists(p) {
+  if (fs.existsSync(p)) {
+    fs.rmSync(p, { recursive: true, force: true });
+    return true;
+  }
+  return false;
+}
+
+function cleanHooksFromSettings() {
+  if (!fs.existsSync(SETTINGS_PATH)) return false;
+  let settings;
+  try {
+    settings = JSON.parse(fs.readFileSync(SETTINGS_PATH, "utf8"));
+  } catch {
+    warn("Could not parse settings.json — skipping hook removal");
+    return false;
+  }
+  if (!settings.hooks) return false;
+  let removed = 0;
+  for (const event of Object.keys(settings.hooks)) {
+    const before = settings.hooks[event].length;
+    settings.hooks[event] = settings.hooks[event].filter((group) => {
+      const hooks = group.hooks || [];
+      return !hooks.some((h) =>
+        typeof h.command === "string" &&
+        HOOK_FILES.some((name) => h.command.includes(name))
+      );
+    });
+    removed += before - settings.hooks[event].length;
+    if (settings.hooks[event].length === 0) delete settings.hooks[event];
+  }
+  if (Object.keys(settings.hooks).length === 0) delete settings.hooks;
+  fs.writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2) + "\n", "utf8");
+  return removed > 0;
+}
+
+function uninstall() {
+  log("");
+  log("\x1b[1mClaude Code Notify — Uninstall\x1b[0m");
+  log("─".repeat(40));
+  log("");
+
+  if (removeIfExists(NOTIFIER_APP)) {
+    ok("Removed ClaudeNotifier.app");
+  } else {
+    info("ClaudeNotifier.app not found — skipping");
+  }
+
+  let hooksRemoved = 0;
+  for (const file of HOOK_FILES) {
+    if (removeIfExists(path.join(HOOKS_DIR, file))) hooksRemoved++;
+  }
+  if (hooksRemoved > 0) {
+    ok(`Removed ${hooksRemoved} hook script(s) from ${HOOKS_DIR}`);
+  } else {
+    info("No hook scripts found — skipping");
+  }
+
+  const iconPath = path.join(ICONS_DIR, "claude.png");
+  if (removeIfExists(iconPath)) {
+    ok(`Removed icon: ${iconPath}`);
+  } else {
+    info("Icon not found — skipping");
+  }
+
+  if (cleanHooksFromSettings()) {
+    ok(`Removed hook entries from ${SETTINGS_PATH}`);
+  } else {
+    info("No hook entries found in settings.json — skipping");
+  }
+
+  try {
+    execSync(`tccutil reset Notifications ${BUNDLE_ID}`, { stdio: "ignore" });
+    ok(`Reset macOS notification permission for ${BUNDLE_ID}`);
+  } catch {
+    warn("Could not reset notification permission — remove it manually if needed:");
+    warn("  System Settings → Notifications → find \"Claude Code\" → remove");
+  }
+
+  log("");
+  log("\x1b[1m\x1b[32mUninstall complete.\x1b[0m");
+  log("Re-run setup to reinstall:");
+  log("  npx @dagim_s/claude-code-notification");
+  log("");
+}
+
+// ─── Entry point ──────────────────────────────────────────────────────────────
+
+if (process.argv.includes("--uninstall")) {
+  uninstall();
+} else {
+  main();
+}
